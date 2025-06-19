@@ -138,12 +138,23 @@ func main() {
 	acceptRoutesCheck := widget.NewCheck("Use Tailscale Subnets", nil)
 	allowLocalNetworksCheck := widget.NewCheck("Allow Local Networks", nil)
 	runExitNodeCheck := widget.NewCheck("Run Exit Node", nil)
+	runSSHCheck := widget.NewCheck("Enable SSH", nil)
+
+	tagsEntry := widget.NewEntry()
+	tagsEntry.SetPlaceHolder("tag:example,tag:server")
+	saveTagsBtn := widget.NewButton("Save Tags", nil)
+	tagsRow := container.NewHBox(widget.NewLabel("Node Tags"), tagsEntry, saveTagsBtn)
+
+	keyExpiryLabel := widget.NewLabel("")
 
 	settingsForm := container.NewVBox(
 		magicDNSCheck,
 		acceptRoutesCheck,
 		allowLocalNetworksCheck,
 		runExitNodeCheck,
+		runSSHCheck,
+		tagsRow,
+		keyExpiryLabel,
 	)
 
 	settingsDialog := dialog.NewCustom("Settings", "Close", settingsForm, w)
@@ -167,6 +178,7 @@ func main() {
 			netInfo.SetText("Network: Error")
 			peersBox.Objects = nil
 			updateRoutesUI(nil)
+			keyExpiryLabel.SetText("Key Expiry: N/A")
 			statusDetails.SetText("")
 			return
 		}
@@ -228,6 +240,13 @@ func main() {
 			magicDNSCheck.SetChecked(prefs.CorpDNS)
 			acceptRoutesCheck.SetChecked(prefs.RouteAll)
 			allowLocalNetworksCheck.SetChecked(prefs.ExitNodeAllowLANAccess)
+			runSSHCheck.SetChecked(prefs.RunSSH)
+			tagsEntry.SetText(strings.Join(prefs.AdvertiseTags, ","))
+			if st.Self != nil && st.Self.KeyExpiry != nil {
+				keyExpiryLabel.SetText("Key Expiry: " + st.Self.KeyExpiry.Format(time.RFC1123))
+			} else {
+				keyExpiryLabel.SetText("Key Expiry: N/A")
+			}
 			// This host is an exit node if it advertises both 0.0.0.0/0 and ::/0
 			isExitNode := false
 			if prefs != nil {
@@ -247,6 +266,7 @@ func main() {
 			// println(prefs.ExitNodeAllowLANAccess)
 		} else {
 			updateRoutesUI(nil)
+			keyExpiryLabel.SetText("Key Expiry: N/A")
 		}
 		if st.BackendState == ipn.Running.String() {
 			connectBtn.Disable()
@@ -539,6 +559,52 @@ func main() {
 		})
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("Failed to set Allow Local Networks: %v", err), w)
+			return
+		}
+		updateStatus()
+	}
+
+	runSSHCheck.OnChanged = func(val bool) {
+		prefs, err := lc.GetPrefs(context.Background())
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("Failed to get preferences: %v", err), w)
+			return
+		}
+		prefs.RunSSH = val
+		_, err = lc.EditPrefs(context.Background(), &ipn.MaskedPrefs{
+			Prefs:     *prefs,
+			RunSSHSet: true,
+		})
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("Failed to set SSH preference: %v", err), w)
+			return
+		}
+		updateStatus()
+	}
+
+	saveTagsBtn.OnTapped = func() {
+		raw := strings.TrimSpace(tagsEntry.Text)
+		var tags []string
+		if raw != "" {
+			for _, t := range strings.Split(raw, ",") {
+				t = strings.TrimSpace(t)
+				if t != "" {
+					tags = append(tags, t)
+				}
+			}
+		}
+		prefs, err := lc.GetPrefs(context.Background())
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("Failed to get preferences: %v", err), w)
+			return
+		}
+		prefs.AdvertiseTags = tags
+		_, err = lc.EditPrefs(context.Background(), &ipn.MaskedPrefs{
+			Prefs:            *prefs,
+			AdvertiseTagsSet: true,
+		})
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("Failed to set tags: %v", err), w)
 			return
 		}
 		updateStatus()
