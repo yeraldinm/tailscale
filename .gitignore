@@ -35,7 +35,8 @@ ssh/tailssh/testcontainers/tailscaled
 
 # Ignore direnv nix-shell environment cache
 .direnv/
-
+vendor/
+*.log
 # Ignore web client node modules
 .vite/
 client/web/node_modules
