@@ -35,6 +35,11 @@ func main() {
 	}
 	defer logFile.Close()
 	log.SetOutput(logFile)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("panic: %v", r)
+		}
+	}()
 
 	log.Println("Starting Tailscale GUI...")
 
@@ -611,11 +616,13 @@ func main() {
 	}
 
 	go func() {
-		for range time.Tick(5 * time.Second) {
-			updateStatus()
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			fyne.Do(func() { updateStatus() })
 		}
 	}()
-	updateStatus()
+	fyne.Do(func() { updateStatus() })
 
 	// Layout
 	statusBox := container.NewVBox(
