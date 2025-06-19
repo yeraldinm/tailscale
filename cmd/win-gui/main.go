@@ -21,6 +21,8 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
+	"github.com/atotto/clipboard"
+
 	"tailscale.com/client/local"
 	"tailscale.com/ipn"
 	"tailscale.com/tailcfg"
@@ -232,7 +234,14 @@ func main() {
 					// dialog.ShowInformation("Ping Result", fmt.Sprintf("Ping %s: %v (err: %v)", p, res, err), w)
 				}()
 			})
-			row := container.NewVBox(container.NewHBox(peerLabel, pingBtn), statsLabel)
+			copyBtn := widget.NewButton("Copy IP", func() {
+				clipboard.WriteAll(peer.TailscaleIPs[0].String())
+				fyne.CurrentApp().SendNotification(&fyne.Notification{
+					Title:   "Copy IP",
+					Content: "IP copied to clipboard",
+				})
+			})
+			row := container.NewVBox(container.NewHBox(peerLabel, pingBtn, copyBtn), statsLabel)
 			peersBox.Add(row)
 		}
 		prefs, err := lc.GetPrefs(context.Background())
