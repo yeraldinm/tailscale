@@ -44,6 +44,8 @@ func main() {
 	statusLabel := widget.NewLabel("Status: unknown")
 	ipLabel := widget.NewLabel("IP: Not connected")
 	netInfo := widget.NewLabel("Network: Not connected")
+	rxLabel := widget.NewLabel("Received: 0 B")
+	txLabel := widget.NewLabel("Sent: 0 B")
 	connectBtn := widget.NewButton("Connect", nil)
 	disconnectBtn := widget.NewButton("Disconnect", nil)
 
@@ -176,13 +178,22 @@ func main() {
 		}
 		if st.Self != nil {
 			netInfo.SetText(fmt.Sprintf("Network: %s", st.Self.DNSName))
+			rxLabel.SetText(fmt.Sprintf("Received: %d B", st.Self.RxBytes))
+			txLabel.SetText(fmt.Sprintf("Sent: %d B", st.Self.TxBytes))
 		} else {
 			netInfo.SetText("Network: Not connected")
+			rxLabel.SetText("Received: 0 B")
+			txLabel.SetText("Sent: 0 B")
 		}
 
 		// peers = make([]string, 0)
 		for _, peer := range st.Peer {
 			peerLabel := widget.NewLabel(fmt.Sprintf("%s (%s)", peer.DNSName, peer.TailscaleIPs[0]))
+			stats := fmt.Sprintf("Rx: %d B  Tx: %d B", peer.RxBytes, peer.TxBytes)
+			if !peer.LastHandshake.IsZero() {
+				stats += fmt.Sprintf("  Last: %s", peer.LastHandshake.Format(time.RFC3339))
+			}
+			statsLabel := widget.NewLabel(stats)
 			addr, err := netip.ParseAddr(peer.TailscaleIPs[0].String())
 			if err != nil {
 				fyne.CurrentApp().SendNotification(&fyne.Notification{
@@ -204,7 +215,7 @@ func main() {
 					// dialog.ShowInformation("Ping Result", fmt.Sprintf("Ping %s: %v (err: %v)", p, res, err), w)
 				}()
 			})
-			row := container.NewHBox(peerLabel, pingBtn)
+			row := container.NewVBox(container.NewHBox(peerLabel, pingBtn), statsLabel)
 			peersBox.Add(row)
 		}
 		prefs, err := lc.GetPrefs(context.Background())
@@ -546,6 +557,8 @@ func main() {
 		statusLabel,
 		ipLabel,
 		netInfo,
+		rxLabel,
+		txLabel,
 		container.NewHBox(connectBtn, disconnectBtn, loginBtn, logoutBtn),
 		exitNodeSelect,
 		clearExitBtn,
